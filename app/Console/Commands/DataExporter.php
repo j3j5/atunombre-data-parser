@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Models\GeoinfoVia;
 use App\Models\IntendenciaData;
 use App\Models\MujeresGeoJson;
 use App\Models\ViasInfo;
@@ -16,7 +17,6 @@ class DataExporter extends Command
      */
     protected $signature = 'parser:export
                             {--filter= : If present, it\'ll add a filter by type}
-                            {read_file : The file from which the original data from the nomenclator should be read.}
                             {output_file : The file where the info will be exported.}';
 
     /**
@@ -55,77 +55,86 @@ class DataExporter extends Command
      */
     private function export(string $filter = null)
     {
-        // Read the geojson that comes from the shapefile (from the Intendencia)
-        // and add all our extra data.
-        $geojson = json_decode(file_get_contents($this->argument('read_file')), true);
+        $geojson = [
+            "type" => "FeatureCollection",
+            "crs" => [
+                "type" => "name",
+                "properties" =>  [
+                    "name" => "urn:ogc:def:crs:OGC:1.3:CRS84",
+                ],
+            ],
+        ];
 
+
+        $query = ViasInfo::getQuery();
+        if ($filter) {
+            $query->where('tipo', $filter);
+        }
+        $vias_info = $query->get();
         // Progress bar
-        $bar = $this->output->createProgressBar(count($geojson['features']));
-
-        // Copy the features
-        $features = $geojson['features'];
-        unset($geojson['features']);
+        $bar = $this->output->createProgressBar($vias_info->count());
 
         $new_features = [];
-        foreach ($features as $feature ) {
+        foreach ($vias_info as $via_info) {
             $bar->advance();
 
-            // There is a weird record at the end of the geojson, ignore it!
-            if (!isset($feature['properties'])) {
-                continue;
-            }
-
-            // Try to find the information from the classification made by DATA UY (type-subtype).
-            $via_info = ViasInfo::where('via', array_get($feature, 'properties.COD_NOMBRE'))->first();
-
-            if ($filter && $via_info->tipo != $filter) {
-                continue;
-            }
             // Find the street on the data from the IM (nomenclator)
-            $intendencia = IntendenciaData::where('via', array_get($feature, 'properties.COD_NOMBRE'))->first();
+            $intendencia = IntendenciaData::where('via', $via_info->via)->first();
             // Try to find if the street was present on the GeoJSON from atunombre 1.0
-            $mujer = MujeresGeoJson::where('cod_nombre', array_get($feature, 'properties.COD_NOMBRE'))->first();
+            $mujer = MujeresGeoJson::where('cod_nombre', $via_info->via)->first();
+            // Find all geopoints for this street
+            $geoinfo = GeoinfoVia::where('COD_NOMBRE', $via_info->via)->get();
 
+            $feature = [];
+            foreach ($geoinfo as $geo) {
+                $geo_data = $geo->toArray();
+                $remove = ['id', 'created_at', 'updated_at', 'geometry'];
+                foreach($remove as $key) {
+                    unset($geo_data[$key]);
+                }
+                $feature['type'] = "Feature";
+                $feature['properties'] = $geo_data;
+                $feature['geometry'] = json_decode($geo->geometry, true);
+                // Overwrite the name to fix the weird encoding!!!
+                $feature['properties']['NOM_CALLE'] = $intendencia->nombre;
 
-            // Overwrite the name to fix the weird encoding!!!
-            $feature['properties']['NOM_CALLE'] = $intendencia->nombre;
+                $data_to_add = [
+                    // Data from meetup (atunombre 2.0)
+                    "extra_nombre_tipo"       => $via_info->tipo,
+                    "extra_nombre_subtipo"    => $via_info->subtipo,
 
-            $data_to_add = [
-                // Data from meetup (atunombre 2.0)
-                "extra_nombre_tipo"       => $via_info->tipo,
-                "extra_nombre_subtipo"    => $via_info->subtipo,
+                    // Data from Intendencia
+                    "extra_nombre_abreviado"              => $intendencia->nombre_abreviado,
+                    "extra_nombre"                        => $intendencia->nombre,
+                    "extra_nombre_de_clasificacion"       => $intendencia->nombre_de_clasificacion,
+                    "extra_especificacion"                => $intendencia->especificacion,
+                    "extra_significado_via"               => $intendencia->significado_via,
+                    "extra_comienzo_numeracion"           => $intendencia->comienzo_numeracion,
+                    "extra_fin_numeracion"                => $intendencia->fin_numeracion,
+                    "extra_tipo_via_descripcion"                    => $intendencia->tipo ? $intendencia->tipo->descripcion : null,
+                    "extra_tipo_via_descripcion_abreviada"          => $intendencia->tipo ? $intendencia->tipo->desc_abreviada: null,
+                    "extra_via_nombre_titulo_descripcion"           => $intendencia->titulo ? $intendencia->titulo->descripcion : null,
+                    "extra_via_nombre_titulo_descripcion_abreviada" => $intendencia->titulo ? $intendencia->titulo->desc_abreviada: null,
 
-                // Data from Intendencia
-                "extra_nombre_abreviado"              => $intendencia->nombre_abreviado,
-                "extra_nombre"                        => $intendencia->nombre,
-                "extra_nombre_de_clasificacion"       => $intendencia->nombre_de_clasificacion,
-                "extra_especificacion"                => $intendencia->especificacion,
-                "extra_significado_via"               => $intendencia->significado_via,
-                "extra_comienzo_numeracion"           => $intendencia->comienzo_numeracion,
-                "extra_fin_numeracion"                => $intendencia->fin_numeracion,
-                "extra_tipo_via_descripcion"                    => $intendencia->tipo ? $intendencia->tipo->descripcion : null,
-                "extra_tipo_via_descripcion_abreviada"          => $intendencia->tipo ? $intendencia->tipo->desc_abreviada: null,
-                "extra_via_nombre_titulo_descripcion"           => $intendencia->titulo ? $intendencia->titulo->descripcion : null,
-                "extra_via_nombre_titulo_descripcion_abreviada" => $intendencia->titulo ? $intendencia->titulo->desc_abreviada: null,
+                    // Data from the previous GeoJSON (atunombre 1.0)
+                    "extra_ano_inaugurada"                => $mujer->nombre_de_calles_m_ano_inaugurada ?? null,
+                    "extra_ano_nac"                       => $mujer->nombre_de_calles_m_ano_nac ?? null,
+                    "extra_ano_muerte"                    => $mujer->nombre_de_calles_m_ano_muerte ?? null,
+                    "extra_bio_140"                       => $mujer->nombre_de_calles_m_bio_140 ?? null,
+                    "extra_bio_600"                       => $mujer->nombre_de_calles_m_bio_600 ?? null,
+                    "extra_bio_externa"                   => $mujer->nombre_de_calles_m_bio_externa ?? null,
+                    "extra_actividad_principal"           => $mujer->nombre_de_calles_m_actividad_principal ?? null,
+                    "extra_localidad"                     => $mujer->nombre_de_calles_m_localidad ?? null,
+                    "extra_departamento"                  => $mujer->nombre_de_calles_m_departamento ?? null,
+                    "extra_uruaguaya"                     => $mujer->nombre_de_calles_m_uruaguaya ?? null,
+                    "extra_etnia"                         => $mujer->nombre_de_calles_m_etnia ?? null,
+                    "extra_imagen"                        => $mujer->nombre_de_calles_m_imagen ?? null,
+                    "extra_obsevaciones"                  => $mujer->nombre_de_calles_m_obsevaciones ?? null,
+                ];
 
-                // Data from the previous GeoJSON (atunombre 1.0)
-                "extra_ano_inaugurada"                => $mujer->nombre_de_calles_m_ano_inaugurada ?? null,
-                "extra_ano_nac"                       => $mujer->nombre_de_calles_m_ano_nac ?? null,
-                "extra_ano_muerte"                    => $mujer->nombre_de_calles_m_ano_muerte ?? null,
-                "extra_bio_140"                       => $mujer->nombre_de_calles_m_bio_140 ?? null,
-                "extra_bio_600"                       => $mujer->nombre_de_calles_m_bio_600 ?? null,
-                "extra_bio_externa"                   => $mujer->nombre_de_calles_m_bio_externa ?? null,
-                "extra_actividad_principal"           => $mujer->nombre_de_calles_m_actividad_principal ?? null,
-                "extra_localidad"                     => $mujer->nombre_de_calles_m_localidad ?? null,
-                "extra_departamento"                  => $mujer->nombre_de_calles_m_departamento ?? null,
-                "extra_uruaguaya"                     => $mujer->nombre_de_calles_m_uruaguaya ?? null,
-                "extra_etnia"                         => $mujer->nombre_de_calles_m_etnia ?? null,
-                "extra_imagen"                        => $mujer->nombre_de_calles_m_imagen ?? null,
-                "extra_obsevaciones"                  => $mujer->nombre_de_calles_m_obsevaciones ?? null,
-            ];
-
-            $feature['properties'] = array_merge($feature['properties'], $data_to_add);
-            $new_features[] = $feature;
+                $feature['properties'] = array_merge($feature['properties'], $data_to_add);
+                $new_features[] = $feature;
+            }
         }
 
         $geojson['features'] = $new_features;

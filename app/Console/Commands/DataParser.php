@@ -3,9 +3,10 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Models\GeoinfoVia;
 use App\Models\IntendenciaData;
-use App\Models\TipoVia;
 use App\Models\MujeresGeoJson;
+use App\Models\TipoVia;
 use App\Models\TituloVia;
 use App\Models\ViasComplete;
 use App\Models\ViasInfo;
@@ -38,21 +39,26 @@ class DataParser extends Command
         $this->info("Trying to import $parse_type");
 
         switch($parse_type) {
-            case 'titulo':
+            case 'titulo':  // Nomenclator info
                 $this->importTitulos();
                 break;
-            case 'tipo':
+            case 'tipo':    // Nomenclator info
                 $this->importTipos();
                 break;
-            case 'viasIM':
+            case 'viasIM':  // Nomenclator info
                 $this->importStreetDataFromIM();
                 break;
-            case 'datauy':
+            case 'datauy':  // atunombre 2.0
                 $this->importDataUY();
                 break;
-            case 'mujeres1.0':
+            case 'mujeres1.0':  // atunombre 1.0
                 $this->importMujeres();
                 break;
+            case 'vias-geojson':
+                $this->importViasGeoInfo(); // GeoJSON exported from QGIS after entering the shapefile from IM
+                break;
+            case 'vias-geo-shapefile':
+                $this->importViasGeoInfo(false);    // Directly feeding the shapefile
             default:
                 $this->error('Invalid type!');
                 exit;
@@ -192,6 +198,43 @@ class DataParser extends Command
             }
         }
         $this->info("$i 'mujeres' have been imported.");
+    }
+
+    /**
+     * Import the geographic data from MVD and store it into the DB
+     *
+     * @see https://www.catalogodatos.gub.uy/dataset/vias-de-transito-montevideo
+     * @note: the geojson is a export of the link above to geojson changing the proyection
+     *        to lat/long coordinates.
+     */
+    private function importViasGeoInfo($geojson = true)
+    {
+        if (!$geojson) {
+            $this->error('not implemented yet!');
+            exit;
+        }
+        // Read the geojson that comes from the shapefile (from the Intendencia)
+        // and add all our extra data.
+        $geojson = json_decode(file_get_contents($this->argument('file')), true);
+
+        // Progress bar
+        $bar = $this->output->createProgressBar(count($geojson['features']));
+
+        foreach ($geojson['features'] as $feature ) {
+            $bar->advance();
+
+            // There is a weird record at the end of the geojson, ignore it!
+            if (!isset($feature['properties'])) {
+                continue;
+            }
+
+            $data = $feature['properties'];
+            $data['geometry'] = isset($feature['geometry']) ? json_encode($feature['geometry']) : '';
+            // There may be more than one entry per COD_NOMBRE (ID).
+            GeoinfoVia::create($data);
+        }
+        $bar->finish();
+        $this->info("\n".count($geojson['features']) .  " streets have been imported.");
     }
 
     /**
