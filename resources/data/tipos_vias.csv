@@ -1,0 +1,14 @@
+TIPO_VIA;DESCRIPCION;DESC_ABREVIADA
+ 01;CALLE          ;          
+ 02;CAMINO         ;CNO       
+ 03;BULEVAR        ;BV        
+ 04;RAMBLA         ;RBLA      
+ 05;PASAJE         ;PSJE      
+ 06;SENDA          ;SDA       
+ 07;AVENIDA        ;AV        
+ 08;RUTA NACIONAL  ;RUTA NAL  
+ 09;SERVIDUMBRE    ;SBRE      
+ 30;PASAJE PEATONAL;PSJE P/V  
+ 31;CURSO DE AGUA  ;CURSO     
+ 32;CIERRE DE CALLE;CIERRE    
+ 33;VIA FERREA     ;FFCC      

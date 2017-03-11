@@ -1,0 +1,48 @@
+TITULO;DESCRIPCION;DESC_ABREVIADA
+ 001;ACTRIZ                                            ;ACTR           
+ 002;ALFEREZ                                           ;ALF            
+ 003;AGRIMENSOR                                        ;AGR            
+ 004;ALMIRANTE                                         ;ALM            
+ 005;ARQUITECTO                                        ;ARQ            
+ 006;CAPITAN                                           ;CAP            
+ 007;CAPITAN DE NAVIO                                  ;CAP NAV        
+ 008;COMODORO                                          ;CDRO           
+ 009;COMANDANTE                                        ;CDTE           
+ 010;CORONEL                                           ;CNEL           
+ 011;CONTADOR                                          ;CR             
+ 012;DOCTOR                                            ;DR             
+ 013;DOCTORA                                           ;DRA            
+ 014;DUQUE                                             ;DUQ            
+ 015;EDIL                                              ;EDIL           
+ 016;ESCRIBANO                                         ;ESC            
+ 017;FRAY                                              ;FRAY           
+ 018;GOBERNADOR                                        ;GDOR           
+ 019;GENERAL                                           ;GRAL           
+ 020;GENERAL ESCRIBANO                                 ;GRAL ESC       
+ 021;INGENIERO                                         ;ING            
+ 022;INGENIERO AGRONOMO                                ;ING AGR        
+ 023;INTENDENTE MUNICIPAL                              ;INT MPAL       
+ 024;LIBERTADOR BRIGADIER GENERAL                      ;LIB BRIG GRAL  
+ 025;LORD                                              ;LORD           
+ 026;MARISCAL                                          ;MCAL           
+ 027;MADRE                                             ;MDRE           
+ 028;MONSEÑOR                                          ;MONS           
+ 029;MAESTRA                                           ;MTRA           
+ 030;MAESTRO                                           ;MTRO           
+ 031;MAYOR                                             ;MYOR           
+ 032;PRESBITERO                                        ;PBRO           
+ 033;PADRE                                             ;PDRE           
+ 034;PROFESOR                                          ;PROF           
+ 035;PROFESOR DOCTOR                                   ;PROF DR        
+ 036;PRESIDENTE                                        ;PTE            
+ 037;PRESIDENTE GENERAL                                ;PTE GRAL       
+ 038;PRESIDENTE INGENIERO                              ;PTE ING        
+ 039;TENIENTE                                          ;TTE            
+ 040;TENIENTE CORONEL                                  ;TTE CNEL       
+ 041;TENIENTE GENERAL                                  ;TTE GRAL       
+ 042;TENIENTE DE NAVIO                                 ;TTE NAV        
+ 043;GENERAL AVIADOR                                   ;GRAL AV        
+ 044;GENERAL ARQUITECTO                                ;GRAL ARQ       
+ 045;CORONEL AVIADOR                                   ;CNEL AV        
+ 046;BRIGADIER GENERAL                                 ;BRIG GRAL      
+ 047;PROFESOR EMERITO                                  ;PROF EMERITO   
