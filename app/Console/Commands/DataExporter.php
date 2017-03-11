@@ -133,8 +133,8 @@ class DataExporter extends Command
         $export_filename = $this->argument('output_file');
 
         file_put_contents($export_filename, json_encode($geojson));
-
-        $this->info("Done. You can see your file at $export_filename");
         $bar->finish();
+
+        $this->info("\nDone. You can see your file at ".getcwd().DIRECTORY_SEPARATOR.$export_filename);
     }
 }

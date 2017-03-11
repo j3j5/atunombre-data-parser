@@ -35,6 +35,8 @@ class DataParser extends Command
     {
         $parse_type = $this->option('data-type');
 
+        $this->info("Trying to import $parse_type");
+
         switch($parse_type) {
             case 'titulo':
                 $this->importTitulos();
@@ -42,13 +44,13 @@ class DataParser extends Command
             case 'tipo':
                 $this->importTipos();
                 break;
-            case 'intendencia':
+            case 'viasIM':
                 $this->importStreetDataFromIM();
                 break;
             case 'datauy':
                 $this->importDataUY();
                 break;
-            case 'mujeres':
+            case 'mujeres1.0':
                 $this->importMujeres();
                 break;
             default:
@@ -68,10 +70,11 @@ class DataParser extends Command
     {
         $titulos_vias = $this->parseCsv();
         $headers = $titulos_vias['headers'];
-        collect($titulos_vias['data'])->each(function($titulo) use ($headers) {
+        $data = collect($titulos_vias['data'])->each(function($titulo) use ($headers) {
             $values = collect($headers)->combine($titulo);
             TituloVia::create($values->toArray());
         });
+        $this->info($data->count() .  " titulos have been imported.");
     }
 
     /**
@@ -83,10 +86,11 @@ class DataParser extends Command
     {
         $tipos_vias = $this->parseCsv();
         $headers = $tipos_vias['headers'];
-        collect($tipos_vias['data'])->each(function($titulo) use ($headers) {
+        $data = collect($tipos_vias['data'])->each(function($titulo) use ($headers) {
             $values = collect($headers)->combine($titulo);
             TipoVia::create($values->toArray());
         });
+        $this->info($data->count() .  " tipos have been imported.");
     }
 
     /**
@@ -99,14 +103,18 @@ class DataParser extends Command
     {
         $intendencia = $this->parseCsv();
         $headers = $intendencia['headers'];
-        collect($intendencia['data'])->each(function($titulo) use ($headers) {
+        $bar = $this->output->createProgressBar(count($intendencia['data']));
+        $data = collect($intendencia['data'])->each(function($titulo) use ($headers, $bar) {
+            $bar->advance();
+            // Ignore weird entries
             if (count($headers) !== count($titulo)) {
-                dump($headers, $titulo);
                 return;
             }
             $values = collect($headers)->combine($titulo);
             IntendenciaData::create($values->toArray());
         });
+        $bar->finish();
+        $this->info("\n".$data->count() .  " streets have been imported.");
     }
 
     /**
@@ -123,18 +131,21 @@ class DataParser extends Command
             'tipo'          => 1,
             'subtipo'       => 2,
         ];
-        $data = $this->parseCsv(';', $columns);
-        $headers = $data['headers'];
-        collect($data['data'])->each(function($info) use ($headers) {
-
+        $classified_data = $this->parseCsv(',', $columns);
+        $headers = $classified_data['headers'];
+        $bar = $this->output->createProgressBar(count($classified_data['data']));
+        $data = collect($classified_data['data'])->each(function($info) use ($headers, $bar) {
+            $bar->advance();
             // Ignore malformed rows
-            if (count($headers) !== count($info) || empty($info[0])) {
+            if (count($headers) !== count($info) || (empty($info[0]) && !is_numeric($info[0]))) {
                 return;
             }
             // Build the model info
             $values = collect($headers)->combine($info);
             ViasInfo::create($values->toArray());
         });
+        $bar->finish();
+        $this->info("\n".$data->count() .  " rows have been imported.");
     }
 
     /**
@@ -146,6 +157,7 @@ class DataParser extends Command
     {
         $filename = $this->argument('file');
         $geojson = json_decode(file_get_contents($filename), true);
+        $i = 0;
         foreach ($geojson['features'] as $feature) {
             // clean up the data, remove unnecessary headers
             $headers_to_remove = [
@@ -175,9 +187,11 @@ class DataParser extends Command
 
             // There are some repeated entries for the streets, only add them once to the DB.
             if (!MujeresGeoJson::where('cod_nombre', $feature['properties']['cod_nombre'])->exists()) {
+                $i++;
                 MujeresGeoJson::create($feature['properties']);
             }
         }
+        $this->info("$i 'mujeres' have been imported.");
     }
 
     /**
@@ -209,7 +223,7 @@ class DataParser extends Command
                 foreach ($data_line as $key => $value) {
                     // Clean up the values
                     $filtered = trim($value);
-                    if (empty($filtered)) {
+                    if (empty($filtered) && !is_numeric($filtered)) {  // Ignore empty values, but '0' is legit
                         $filtered = null;
                     }
 
